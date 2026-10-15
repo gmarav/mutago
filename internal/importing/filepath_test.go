@@ -2,6 +2,7 @@ package importing
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	"github.com/quality-gates/mutago/v2/internal/models"
@@ -38,7 +39,7 @@ func TestFilesOfArgs(t *testing.T) {
 	} {
 		var opts = &models.Options{}
 		got := FilesOfArgs(test.args, opts)
-		assert.Equal(t, test.expect, got, fmt.Sprintf("With args: %#v", test.args))
+		assert.Equal(t, test.expect, slashFiles(got), fmt.Sprintf("With args: %#v", test.args))
 	}
 }
 
@@ -47,7 +48,7 @@ func TestFilesOfArgsIncludesCgoFiles(t *testing.T) {
 
 	got := FilesOfArgs([]string{"./cgofixture"}, opts)
 
-	assert.Equal(t, []string{"cgofixture/cgo.go"}, got)
+	assert.Equal(t, []string{"cgofixture/cgo.go"}, slashFiles(got))
 }
 
 func TestPackagesWithFilesOfArgs(t *testing.T) {
@@ -81,10 +82,27 @@ func TestPackagesWithFilesOfArgs(t *testing.T) {
 				"../importing/filepathfixtures/third.go",
 			}}},
 		},
+		{
+			// Each directory is its own package. On Windows all files went
+			// into one package "." before, so a ./... run took the coverage
+			// and the tests of the first package for every mutant.
+			[]string{"./filepathfixtures/..."},
+			[]Package{
+				{Name: "filepathfixtures", Files: []string{
+					"filepathfixtures/fifth.go",
+					"filepathfixtures/first.go",
+					"filepathfixtures/second.go",
+					"filepathfixtures/third.go",
+				}},
+				{Name: "filepathfixtures/secondfixturespackage", Files: []string{
+					"filepathfixtures/secondfixturespackage/fourth.go",
+				}},
+			},
+		},
 	} {
 		var opts = &models.Options{}
 		got := PackagesWithFilesOfArgs(test.args, opts)
-		assert.Equal(t, test.expect, got, fmt.Sprintf("With args: %#v", test.args))
+		assert.Equal(t, test.expect, slashPackages(got), fmt.Sprintf("With args: %#v", test.args))
 	}
 }
 
@@ -109,7 +127,7 @@ func TestFilesWithSkipWithoutTests(t *testing.T) {
 		var opts = &models.Options{}
 		opts.Config.SkipFileWithoutTest = true
 		got := FilesOfArgs(test.args, opts)
-		assert.Equal(t, test.expect, got, fmt.Sprintf("With args: %#v", test.args))
+		assert.Equal(t, test.expect, slashFiles(got), fmt.Sprintf("With args: %#v", test.args))
 	}
 }
 
@@ -142,7 +160,7 @@ func TestFilesWithSkipWithBuildTagsTests(t *testing.T) {
 		var opts = models.NewOptions()
 		opts.Config.SkipFileWithBuildTag = true
 		got := FilesOfArgs(test.args, opts)
-		assert.Equal(t, test.expect, got, fmt.Sprintf("With args: %#v", test.args))
+		assert.Equal(t, test.expect, slashFiles(got), fmt.Sprintf("With args: %#v", test.args))
 	}
 }
 
@@ -152,7 +170,7 @@ func TestFilesWithBuildTagsOnlyDoesNotSkipUntestedFiles(t *testing.T) {
 	opts.Config.SkipFileWithBuildTag = true
 
 	got := FilesOfArgs([]string{"./filepathfixtures"}, opts)
-	assert.Equal(t, []string{"filepathfixtures/first.go", "filepathfixtures/second.go"}, got)
+	assert.Equal(t, []string{"filepathfixtures/first.go", "filepathfixtures/second.go"}, slashFiles(got))
 }
 
 func TestFilesWithExcludedDirs(t *testing.T) {
@@ -215,6 +233,29 @@ func TestFilesWithExcludedDirs(t *testing.T) {
 		var opts = &models.Options{}
 		opts.Config.ExcludeDirs = test.config
 		got := FilesOfArgs(test.args, opts)
-		assert.Equal(t, test.expect, got, fmt.Sprintf("With args: %#v", test.args))
+		assert.Equal(t, test.expect, slashFiles(got), fmt.Sprintf("With args: %#v", test.args))
 	}
+}
+
+// slashFiles gives the file names with forward slashes, so that the expected
+// values in this file are true on Windows too.
+func slashFiles(files []string) []string {
+	if files == nil {
+		return nil
+	}
+	out := make([]string, len(files))
+	for i, file := range files {
+		out[i] = filepath.ToSlash(file)
+	}
+	return out
+}
+
+// slashPackages gives the package names and their file names with forward
+// slashes.
+func slashPackages(pkgs []Package) []Package {
+	out := make([]Package, len(pkgs))
+	for i, pkg := range pkgs {
+		out[i] = Package{Name: filepath.ToSlash(pkg.Name), Files: slashFiles(pkg.Files)}
+	}
+	return out
 }

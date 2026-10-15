@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This pr
 
 ## [Unreleased]
 
+### Fixed
+- On Windows, a run with more than one target directory (such as `./...`) now tests each package with its own tests and coverage. Before, all files went into one package, so every mutant ran the first package's tests and used its coverage profile: with `--coverage` all mutants outside that package were NOT COVERED, and without it they all ESCAPED. `--git-diff-lines` from the module root gave a false score the same way (#319).
+- On Windows, `exclude_dirs` now excludes files below the named directories. Before, the entries (with `/`) never matched the file names (with `\`) (#319).
+
 ## [v2.10.30] — 2026-10-16
 
 ### Fixed

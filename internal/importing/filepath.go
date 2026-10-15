@@ -14,7 +14,6 @@ import (
 	"go/build"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -45,7 +44,10 @@ func packagesWithFilesOfArgs(args []string, opts *models.Options) map[string]map
 			continue
 		}
 		fileLookup[filename] = struct{}{}
-		pkgName := path.Dir(filename)
+		// Use filepath.Dir, not path.Dir: on Windows the file names use
+		// backslashes, and path.Dir gives "." for each of them. Then all
+		// files of all target directories go into one package.
+		pkgName := filepath.Dir(filename)
 		pkg, ok := pkgs[pkgName]
 		if !ok {
 			pkg = make(map[string]struct{})
@@ -90,8 +92,11 @@ func shouldSkipFile(filename string, opts *models.Options) bool {
 	if strings.HasSuffix(filename, testFileSuffix) {
 		return true
 	}
+	// Compare with forward slashes on both sides: exclude_dirs entries use
+	// "/", and on Windows the file names use "\".
+	slashName := filepath.ToSlash(filename)
 	for _, exDir := range opts.Config.ExcludeDirs {
-		if strings.HasPrefix(filename, exDir) {
+		if strings.HasPrefix(slashName, filepath.ToSlash(exDir)) {
 			return true
 		}
 	}
